@@ -1,0 +1,19 @@
+{
+  "name": "miniinsta",
+  "version": "1.0.0",
+  "description": "Pisike vaheliides Mini-Insta andmebaasile",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "PP",
+  "license": "ISC",
+  "dependencies": {
+    "apicache": "^1.6.2",
+    "express": "^4.16.2",
+    "hbs": "^4.1.2",
+    "morgan": "^1.9.0",
+    "mssql": "^4.1.0",
+    "redis": "^3.1.2"
+  }
+}

@@ -20,6 +20,7 @@ exports.apiIndex = function(req, res){
             {name: 'Post', url: '/api/posts/19'},
             {name: 'General Statistics', url: '/api/stats'},
             {name: 'Top 10 Followed Users', url: '/api/stats/top10/followedusers'},
+            {name: 'Top 10 Commented Users', url: '/api/stats/top10/commentedusers'},
             {name: 'User registrations', url: '/api/stats/registrations'},
             {name: 'Gender Division', url: '/api/stats/genderdivison'},
         ]
@@ -134,22 +135,157 @@ order by Post.CreationTime desc, PostID desc;
         res.status(500).send('ERROR: ' + error);
     });
 };
-exports.postDetails = function(req, res){
-    res.status(404).send('Invalid route');
-};
-exports.statistics = function(req, res){
-    res.status(404).send('Invalid route');
-};
-exports.top10followedUsers = function(req, res){
-    res.status(404).send('Invalid route');
-};
-exports.userRegistrations = function(req, res){
-    res.status(404).send('Invalid route');
-};
-exports.genderDivision = function(req, res){
-    res.status(404).send('Invalid route');
+exports.postDetails = function(req, res) {
+    let id = '';
+    // If there's an ID passed along
+    if (typeof(req.params.id) !== 'undefined') {
+        id = req.params.id;
+    }
+
+    let query = `SELECT Post.ID, Username, [User].ImageUrl, LocationName, Location,
+         IsNull((SELECT Count(PostID) 
+                   FROM dbo.[Liking] 
+                  WHERE PostID = Post.ID), 0) AS Likes 
+       FROM dbo.Post INNER JOIN 
+            dbo.[User] ON Post.UserID = [User].ID 
+      WHERE Post.ID = ${id}
+      ORDER BY Post.CreationTime DESC; 
+     SELECT PostMedia.ID, PostMedia.MediaTypeID, PostMedia.MediaFileUrl 
+       FROM dbo.Post INNER JOIN 
+            dbo.PostMedia ON Post.ID = PostMedia.PostID  
+      WHERE Post.ID = ${id}
+      ORDER BY Post.CreationTime DESC; 
+     SELECT ID AS CommentID, Comment, CreationTime 
+       FROM Comment 
+      WHERE PostID = ${id}
+      ORDER BY CreationTime`;
+
+    let result = sql.querySql(query, function(data) {
+        if (data !== undefined)
+        {
+            console.log('DATA rowsAffected: ' + data.rowsAffected);
+
+            let postitus = data.recordsets[0][0];
+            if (data.recordsets.length > 1) {
+                let media = data.recordsets[1];
+
+                postitus.media = media;
+            }
+            if (data.recordsets.length > 2) {
+                let comments = data.recordsets[2];
+
+                postitus.comments = comments;
+            }
+            
+            res.send(postitus);
+        }
+    }, function(err) {
+        console.log('ERROR: ' + err);
+        res.status(500).send('ERROR: ' + err);
+    });
 };
 
-exports.default = function(req, res){
-    res.status(404).send('Invalid route');
+exports.statistics = function(req, res) {
+    let query = `SELECT 
+         (SELECT Count(ID) FROM dbo.[User]) AS UserCount,
+         (SELECT Count(ID) FROM Post) AS PostCount,
+         (SELECT Avg(PostCount) 
+            FROM (SELECT UserID, Count(ID) AS PostCount FROM Post GROUP BY UserID) PostsPerUser) AS AvgPostsPerUser,
+         (SELECT Max(PostCount) 
+            FROM (SELECT UserID, Count(ID) AS PostCount FROM Post GROUP BY UserID) PostsPerUser) AS MaxPostsPerUser,
+         (SELECT Avg(CommentCount) 
+            FROM (SELECT PostID, Count(ID) AS CommentCount FROM Comment GROUP BY PostID) CommentsPerPost) AS AvgCommentsPerPost,
+         (SELECT Max(CommentCount) 
+            FROM (SELECT PostID, Count(ID) AS CommentCount FROM Comment GROUP BY PostID) CommentsPerPost) AS MaxCommentsPerPost,
+         (SELECT Avg(LikeCount) 
+            FROM (SELECT PostID, Count(PostID) AS LikeCount FROM [Liking] GROUP BY PostID) LikesPerPost) AS AvgLikesPerPost,
+         (SELECT Max(LikeCount) 
+            FROM (SELECT PostID, Count(PostID) AS LikeCount FROM [Liking] GROUP BY PostID) LikesPerPost) AS MaxLIkesPerPost`;
+    
+    let result = sql.querySql(query, function(data) {
+        if (data !== undefined)
+        {
+            console.log('DATA rowsAffected: ' + data.rowsAffected);
+            res.send(data.recordset);
+        }
+    }, function(err) {
+        console.log('ERROR: ' + err);
+        res.status(500).send('ERROR: ' + err);
+    });
+};
+exports.top10followedUsers = function(req, res){
+    let query = `SELECT TOP 10 [User].ID, [User].Username, Count(Following.FolloweeID) AS Followers
+        FROM [User] LEFT OUTER JOIN
+            Following ON [User].ID = Following.FolloweeID
+        GROUP BY [User].ID, [User].Username
+        ORDER BY Followers desc, Username`;
+    let result = sql.querySql(query, function(data) {
+        if (data !== undefined)
+        {
+            console.log('DATA rowsAffected: ' + data.rowsAffected);
+            res.send(data.recordset);
+        }
+    }, function(err) {
+        console.log('ERROR: ' + err);
+        res.status(500).send('ERROR: ' + err);
+    });
+};
+exports.top10CommentedUsers = function(req, res) {
+    let query = `SELECT TOP 10 [User].ID, [User].Username, Count(Post.ID) AS Posts 
+         FROM Comment INNER JOIN 
+              Post ON Comment.PostID = Post.ID INNER JOIN 
+              [User] ON Post.UserID = [User].ID 
+        GROUP BY [User].ID, [User].Username 
+        ORDER BY Posts desc`;
+
+    let result = sql.querySql(query, function(data) {
+        if (data !== undefined)
+        {
+            console.log('DATA rowsAffected: ' + data.rowsAffected);
+            res.send(data.recordset);
+        }
+    }, function(err) {
+        console.log('ERROR: ' + err);
+        res.status(500).send('ERROR: ' + err);
+    });
+};
+
+exports.userRegistrations = function(req, res) {
+    let query = `SELECT CAST(CreationTime AS Date) AS [Date], Count(ID) AS Count 
+         FROM [User] 
+        GROUP BY CAST(CreationTime AS Date) 
+        ORDER BY [Date]`;
+    
+    let result = sql.querySql(query, function(data) {
+        if (data !== undefined)
+        {
+            console.log('DATA rowsAffected: ' + data.rowsAffected);
+            res.send(data.recordset);
+        }
+    }, function(err) {
+        console.log('ERROR: ' + err);
+        res.status(500).send('ERROR: ' + err);
+    });
+};
+
+exports.genderDivision = function(req, res) {
+    let query = `SELECT Gender.Name AS Gender, Count([User].ID) AS Users 
+         FROM dbo.[User] INNER JOIN 
+              dbo.Gender ON [User].GenderID = Gender.ID 
+        GROUP BY Gender.Name`;
+    
+    let result = sql.querySql(query, function(data) {
+        if (data !== undefined)
+        {
+            console.log('DATA rowsAffected: ' + data.rowsAffected);
+            res.send(data.recordset);
+        }
+    }, function(err) {
+        console.log('ERROR: ' + err);
+        res.status(500).send('ERROR: ' + err);
+    });
+};
+
+exports.default = function(req, res) {
+	res.status(404).send('Invalid route');
 };

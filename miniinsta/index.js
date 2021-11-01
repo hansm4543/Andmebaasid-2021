@@ -23,6 +23,7 @@ app.get('/api/frontpage/', routes.frontpage);
 app.get('/api/profile/:id', routes.profilePage);
 app.get('/api/posts/:id', routes.postDetails);
 app.get('/api/stats/', routes.statistics);
+app.get('/api/stats/top10/commentedusers', routes.top10CommentedUsers);
 app.get('/api/stats/top10/followedusers', routes.top10followedUsers);
 app.get('/api/stats/registrations/', routes.userRegistrations);
 app.get('/api/stats/genderdivison/', routes.genderDivision);
